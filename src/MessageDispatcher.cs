@@ -48,7 +48,7 @@ namespace Thon.Hotels.FishBus
             {
                 var body = Encoding.UTF8.GetString(message.Body);
                 var sw = Stopwatch.StartNew();
-                Logger.LogDebug($"Received message: SequenceNumber:{message.SystemProperties.SequenceNumber} Body:{body}");
+                Logger.LogDebug("Received message: SequenceNumber: {SequenceNumber} Body: {Body}", message.SystemProperties.SequenceNumber, body);
                 try
                 {
                     if (!string.IsNullOrWhiteSpace(message.Label))
@@ -59,14 +59,14 @@ namespace Thon.Hotels.FishBus
                     }
                     else
                     {
-                        Logger.LogError("Message label is not set. \n Message: {@messageBody} \n Forwarding to DLX", body);
+                        Logger.LogError("Message label is not set. \n Message: {Body} \n Forwarding to DLX", body);
                         await AddToDeadLetter(message.SystemProperties.LockToken, "Message label is not set.");
                     }
                 }
                 catch (JsonException jsonException)
                 {
                     Logger.LogError(jsonException,
-                        "Unable to deserialize message. \n Message: {@messageBody} \n Forwarding to DLX", body);
+                        "Unable to deserialize message. \n Message: {Body} \n Forwarding to DLX", body);
                     await AddToDeadLetter(message.SystemProperties.LockToken, jsonException.Message);
                 }
                 catch (Exception e)
@@ -76,7 +76,7 @@ namespace Thon.Hotels.FishBus
                     throw;
                 }
 
-                Logger.LogDebug($"Completed handling message in {sw.ElapsedMilliseconds} ms");
+                Logger.LogDebug("Completed handling message in {HandlingTime} ms", sw.ElapsedMilliseconds);
             }
         }
 
@@ -101,7 +101,7 @@ namespace Thon.Hotels.FishBus
             }
             else
             {
-                Logger.LogDebug("No handler registered for the given {Label}. {@Body}", label, body);
+                Logger.LogDebug("No handler registered for the given {Label}. {Body}", label, body);
                 await markCompleted();
             }
         }
@@ -118,8 +118,8 @@ namespace Thon.Hotels.FishBus
             if (!tasks.Any())
                 return true;
 
-            if (tasks.Count() > 1)
-                Logger.LogWarning($"More than one method named Handle in type: {handler.GetType().FullName}");
+            if (tasks.Length > 1)
+                Logger.LogWarning("More than one method named Handle in type: {HandlerType}", handler.GetType().FullName);
 
             var results = await Task.WhenAll(tasks);
             var aborted = results.FirstOrDefault(HandlerResult.IsAbort);

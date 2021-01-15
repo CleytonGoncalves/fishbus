@@ -44,10 +44,11 @@ namespace Thon.Hotels.FishBus
         {
             var context = exceptionReceivedEventArgs.ExceptionReceivedContext;
             Logger.LogError(exceptionReceivedEventArgs.Exception,
-                        $@"Message handler encountered an exception.
-                        Endpoint: {context.Endpoint}
-                        Entity Path: {context.EntityPath}
-                        Executing Action: {context.Action}");
+                        @"Message handler encountered an exception.
+                        Endpoint: {Endpoint}
+                        Entity Path: {EntityPath}
+                        Executing Action: {Action}",
+                        context.Endpoint, context.EntityPath, context.Action);
 
             return Task.CompletedTask;
         }
