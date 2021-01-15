@@ -3,7 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.ServiceBus;
 using Microsoft.Extensions.Hosting;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Thon.Hotels.FishBus
 {
@@ -12,9 +13,17 @@ namespace Thon.Hotels.FishBus
     {
         private MessagingConfiguration Configuration { get; }
 
+        private ILogger<MessagingService> Logger { get; }
+
         public MessagingService(MessagingConfiguration configuration)
+            : this(configuration, NullLogger<MessagingService>.Instance)
+        {
+        }
+
+        public MessagingService(MessagingConfiguration configuration, ILogger<MessagingService> logger)
         {
             Configuration = configuration;
+            Logger = logger;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -26,7 +35,7 @@ namespace Thon.Hotels.FishBus
             }
             catch (Exception exception)
             {
-                Log.Error($"Error registering message handler", exception);
+                Logger.LogError($"Error registering message handler", exception);
                 return Task.CompletedTask;
             }
         }
@@ -34,7 +43,7 @@ namespace Thon.Hotels.FishBus
         Task ExceptionReceivedHandler(ExceptionReceivedEventArgs exceptionReceivedEventArgs)
         {
             var context = exceptionReceivedEventArgs.ExceptionReceivedContext;
-            Log.Error(exceptionReceivedEventArgs.Exception,
+            Logger.LogError(exceptionReceivedEventArgs.Exception,
                         $@"Message handler encountered an exception.
                         Endpoint: {context.Endpoint}
                         Entity Path: {context.EntityPath}
@@ -45,7 +54,7 @@ namespace Thon.Hotels.FishBus
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            Log.Information("Signal received. Gracefully shutting down.");
+            Logger.LogInformation("Signal received. Gracefully shutting down.");
             await Configuration.Close();
             Thread.Sleep(1000);
         }

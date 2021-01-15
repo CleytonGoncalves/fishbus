@@ -8,8 +8,9 @@ using System.Threading.Tasks;
 using Microsoft.Azure.ServiceBus;
 using Microsoft.Azure.ServiceBus.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
-using Serilog;
 
 namespace Thon.Hotels.FishBus
 {
@@ -23,23 +24,31 @@ namespace Thon.Hotels.FishBus
 
         private MessageHandlerRegistry Registry { get; }
 
+        private ILogger<MessageDispatcher> Logger { get; }
+
         internal MessageDispatcher(IServiceScopeFactory scopeFactory, IReceiverClient client, MessageHandlerRegistry registry, LogCorrelationHandler logCorrelationHandler)
+            : this(scopeFactory, client, registry, logCorrelationHandler, NullLogger<MessageDispatcher>.Instance)
+        {
+        }
+
+        internal MessageDispatcher(IServiceScopeFactory scopeFactory, IReceiverClient client, MessageHandlerRegistry registry, LogCorrelationHandler logCorrelationHandler, ILogger<MessageDispatcher> logger)
         {
             LogCorrelationHandler = logCorrelationHandler;
             ScopeFactory = scopeFactory;
             Client = client;
             Registry = registry;
+            Logger = logger;
         }
 
         // Call all handlers for the message type given by the message label.
         // There can be multiple handlers per message type
         public async Task ProcessMessage(Message message, CancellationToken token)
         {
-            using (LogCorrelationHandler.PushToLogContext.Invoke(message))
+            using (LogCorrelationHandler.PushToLogContext.Invoke(Logger, message))
             {
                 var body = Encoding.UTF8.GetString(message.Body);
                 var sw = Stopwatch.StartNew();
-                Log.Debug($"Received message: SequenceNumber:{message.SystemProperties.SequenceNumber} Body:{body}");
+                Logger.LogDebug($"Received message: SequenceNumber:{message.SystemProperties.SequenceNumber} Body:{body}");
                 try
                 {
                     if (!string.IsNullOrWhiteSpace(message.Label))
@@ -50,24 +59,24 @@ namespace Thon.Hotels.FishBus
                     }
                     else
                     {
-                        Log.Error("Message label is not set. \n Message: {@messageBody} \n Forwarding to DLX", body);
+                        Logger.LogError("Message label is not set. \n Message: {@messageBody} \n Forwarding to DLX", body);
                         await AddToDeadLetter(message.SystemProperties.LockToken, "Message label is not set.");
                     }
                 }
                 catch (JsonException jsonException)
                 {
-                    Log.Error(jsonException,
+                    Logger.LogError(jsonException,
                         "Unable to deserialize message. \n Message: {@messageBody} \n Forwarding to DLX", body);
                     await AddToDeadLetter(message.SystemProperties.LockToken, jsonException.Message);
                 }
                 catch (Exception e)
                 {
-                    Log.Error(e, "Caught exception while handling message with label {Label} and body {Body}",
+                    Logger.LogError(e, "Caught exception while handling message with label {Label} and body {Body}",
                         message.Label, body);
                     throw;
                 }
 
-                Log.Debug($"Completed handling message in {sw.ElapsedMilliseconds} ms");
+                Logger.LogDebug($"Completed handling message in {sw.ElapsedMilliseconds} ms");
             }
         }
 
@@ -92,7 +101,7 @@ namespace Thon.Hotels.FishBus
             }
             else
             {
-                Log.Debug("No handler registered for the given {Label}. {@Body}", label, body);
+                Logger.LogDebug("No handler registered for the given {Label}. {@Body}", label, body);
                 await markCompleted();
             }
         }
@@ -110,7 +119,7 @@ namespace Thon.Hotels.FishBus
                 return true;
 
             if (tasks.Count() > 1)
-                Log.Warning($"More than one method named Handle in type: {handler.GetType().FullName}");
+                Logger.LogWarning($"More than one method named Handle in type: {handler.GetType().FullName}");
 
             var results = await Task.WhenAll(tasks);
             var aborted = results.FirstOrDefault(HandlerResult.IsAbort);

@@ -1,18 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
 using Microsoft.Azure.ServiceBus;
-using Serilog.Context;
+using Microsoft.Extensions.Logging;
 
 namespace Thon.Hotels.FishBus
 {
     public class LogCorrelationHandler
     {
-        internal Func<Message, IDisposable> PushToLogContext { get; set; }
+        internal Func<ILogger, Message, IDisposable> PushToLogContext { get; set; }
 
         internal LogCorrelationHandler(bool useCorrelationLogging, LogCorrelationOptions options = null)
         {
             if (!useCorrelationLogging)
             {
-                PushToLogContext = (message) => new EmptyContextPusher();
+                PushToLogContext = (logger, message) => new EmptyContextPusher();
             }
             else
             {
@@ -24,16 +25,16 @@ namespace Thon.Hotels.FishBus
             }
         }
 
-        private static Func<Message, IDisposable> CreatePushToLogContext(string logPropertyName,
+        private static Func<ILogger, Message, IDisposable> CreatePushToLogContext(string logPropertyName,
             string messagePropertyName, Action<string> setCorrelationLogId) =>
-            (message) =>
+            (logger, message) =>
             {
                 var logCorrelationId = message.UserProperties.ContainsKey(messagePropertyName)
                     ? message.UserProperties[messagePropertyName]
                     : Guid.NewGuid();
 
                 setCorrelationLogId?.Invoke(logCorrelationId.ToString());
-                return LogContext.PushProperty(logPropertyName, logCorrelationId);
+                return logger.BeginScope(new Dictionary<string, object> { { logPropertyName, messagePropertyName } });
             };
     }
 
