@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Thon.Hotels.FishBus
 {
-    /// The main/singelton service that contains all messaging clients
+    /// The main/singleton service that contains all messaging clients
     public class MessagingService : IHostedService
     {
         private MessagingConfiguration Configuration { get; }
